@@ -9,10 +9,12 @@ namespace University.Controllers
     [ApiController]
     public class TeacherController : Controller
     {
+        private readonly ILogger<TeacherController> _logger;
         private readonly ITeacherRepository _teacherRepository;
 
-        public TeacherController(ITeacherRepository teacherRepository)
+        public TeacherController(ILogger<TeacherController> logger, ITeacherRepository teacherRepository)
         {
+            _logger = logger;
             _teacherRepository = teacherRepository;
         }
 
@@ -23,12 +25,16 @@ namespace University.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Teacher>>> GetTeachers()
         {
+            _logger.LogInformation($"Fetching all teachers");
+
             try
             {
                 return Ok(await _teacherRepository.GetAllAsync());
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while fetching all teachers");
+
                 throw new Exception("Can't get all teachers", ex);
             }
         }
@@ -40,17 +46,24 @@ namespace University.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<Teacher>> GetTeacherById(int id)
         {
+            _logger.LogInformation($"Fetching teacher with ID: {id}");
+
             try
             {
                 var teacher = await _teacherRepository.GetByIdAsync(id);
 
                 if (teacher == null)
-                    return NotFound();
+                {
+                    _logger.LogWarning($"Teacher with ID {id} not found");
 
+                    return NotFound();
+                }
                 return Ok(teacher);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error occurred while fetching teacher with ID {id}");
+
                 throw new Exception("Can't get teacher with this Id", ex);
             }
         }
@@ -63,17 +76,25 @@ namespace University.Controllers
         public async Task<ActionResult<Teacher>> CreateTeacher(Teacher teacher)
         {
             if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid teacher model received");
+
                 return BadRequest(ModelState);
+            }
 
             try
             {
                 await _teacherRepository.AddAsync(teacher);
                 await _teacherRepository.SaveAsync();
 
+                _logger.LogInformation($"Teacher with ID {teacher.TeacherId} created");
+
                 return CreatedAtAction(nameof(GetTeacherById), new { id = teacher.TeacherId }, teacher);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while creating a new teacher");
+
                 throw new Exception("Can't create new teacher", ex);
             }
         }
@@ -87,20 +108,32 @@ namespace University.Controllers
         public async Task<IActionResult> UpdateTeacher(int id, Teacher teacher)
         {
             if (id != teacher.TeacherId)
+            {
+                _logger.LogWarning($"Mismatch between route ID and teacher ID: {id} != {teacher.TeacherId}");
+
                 return BadRequest();
+            }
 
             if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid teacher model received for update");
+
                 return BadRequest(ModelState);
+            }
 
             try
             {
                 _teacherRepository.Update(teacher);
                 await _teacherRepository.SaveAsync();
 
+                _logger.LogInformation($"Teacher with ID {teacher.TeacherId} updated");
+
                 return NoContent();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error occurred while updating teacher with ID {teacher.TeacherId}");
+
                 throw new Exception("Can't update teacher", ex);
             }
         }
@@ -112,20 +145,30 @@ namespace University.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteTeacher(int id)
         {
+            _logger.LogInformation($"Attempting to delete teacher with ID: {id}");
+
             try
             {
                 var teacher = await _teacherRepository.GetByIdAsync(id);
 
                 if (teacher == null)
+                {
+                    _logger.LogWarning($"Teacher with ID {id} not found");
+
                     return NotFound();
+                }
 
                 _teacherRepository.Delete(teacher);
                 await _teacherRepository.SaveAsync();
+
+                _logger.LogInformation($"Teacher with ID {id} deleted");
 
                 return NoContent();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error occurred while deleting teacher with ID {id}");
+
                 throw new Exception("Can't delete teacher", ex);
             }
         }

@@ -9,10 +9,12 @@ namespace University.Controllers
     [ApiController]
     public class StudentController : Controller
     {
+        private readonly ILogger<StudentController> _logger;
         private readonly IStudentRepository _studentRepository;
         
-        public StudentController(IStudentRepository studentRepository)
+        public StudentController(ILogger<StudentController> logger, IStudentRepository studentRepository)
         {
+            _logger = logger;
             _studentRepository = studentRepository;
         }
 
@@ -23,12 +25,16 @@ namespace University.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Student>>> GetStudents()
         {
+            _logger.LogInformation($"Fetching all students");
+
             try
             {
                 return Ok(await _studentRepository.GetAllAsync());
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while fetching all students");
+
                 throw new Exception("Can't get all students", ex);
             }
             
@@ -41,17 +47,24 @@ namespace University.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<Student>> GetStudentById(int id)
         {
+            _logger.LogInformation($"Fetching student with ID: {id}");
+
             try
             {
                 var student = await _studentRepository.GetByIdAsync(id);
 
                 if (student == null)
-                    return NotFound();
+                {
+                    _logger.LogWarning($"Student with ID {id} not found");
 
+                    return NotFound();
+                }
                 return Ok(student);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error occurred while fetching student with ID {id}");
+
                 throw new Exception("Can't get student with this Id", ex);
             }
         }
@@ -64,17 +77,25 @@ namespace University.Controllers
         public async Task<ActionResult<Student>> CreateStudent(Student student)
         {
             if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid student model received");
+
                 return BadRequest(ModelState);
+            }
 
             try
             {
                 await _studentRepository.AddAsync(student);
                 await _studentRepository.SaveAsync();
 
+                _logger.LogInformation($"Student with ID {student.StudentId} created");
+
                 return CreatedAtAction(nameof(GetStudentById), new { id = student.StudentId }, student);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while creating a new student");
+
                 throw new Exception("Can't create new student", ex);
             }
         }
@@ -89,21 +110,31 @@ namespace University.Controllers
         {
             if (id != student.StudentId)
             {
+                _logger.LogWarning($"Mismatch between route ID and student ID: {id} != {student.StudentId}");
+
                 return BadRequest();
             }
 
             if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid student model received for update");
+
                 return BadRequest(ModelState);
+            }
 
             try
             {
                 _studentRepository.Update(student);
                 await _studentRepository.SaveAsync();
 
+                _logger.LogInformation($"Student with ID {student.StudentId} updated");
+
                 return NoContent();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error occurred while updating student with ID {student.StudentId}");
+
                 throw new Exception("Can't update student", ex);
             }
         }
@@ -115,20 +146,30 @@ namespace University.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteStudent(int id)
         {
+            _logger.LogInformation($"Attempting to delete student with ID: {id}");
+
             try
             {
                 var student = await _studentRepository.GetByIdAsync(id);
 
                 if (student == null)
+                {
+                    _logger.LogWarning($"Student with ID {id} not found");
+
                     return NotFound();
+                }
 
                 _studentRepository.Delete(student);
                 await _studentRepository.SaveAsync();
+
+                _logger.LogInformation($"Student with ID {id} deleted");
 
                 return NoContent();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error occurred while deleting student with ID {id}");
+
                 throw new Exception("Can't delete student", ex);
             }
         }
